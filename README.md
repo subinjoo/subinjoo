@@ -2,8 +2,11 @@
 
 - Biomimetics
 - Surgical Navigation
+  - Registration, Tracking
 - Robot Dynamics
 - Medical image processing
+  - Image generation using Autoencoder, GAN
+  - Landmarks detection using Reinforcement Learning 
 
 
 <!--
