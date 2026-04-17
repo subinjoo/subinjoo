@@ -41,6 +41,41 @@
         a:hover {
             text-decoration: underline;
         }
+        .demo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .demo-card {
+            display: flex;
+            flex-direction: column;
+            background: #f8f9ff;
+            border: 1px solid #d0d7ff;
+            border-radius: 8px;
+            padding: 1.2rem;
+            gap: 0.5rem;
+            transition: box-shadow 0.15s, transform 0.15s;
+        }
+        .demo-card:hover {
+            box-shadow: 0 4px 14px rgba(0,123,255,0.15);
+            transform: translateY(-2px);
+        }
+        .demo-card h4 { margin: 0; color: #007bff; font-size: 0.95rem; }
+        .demo-card p  { margin: 0; font-size: 0.82rem; color: #555; flex: 1; }
+        .demo-card a.btn {
+            display: inline-block;
+            margin-top: 0.4rem;
+            background: #007bff;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 5px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-decoration: none;
+            text-align: center;
+        }
+        .demo-card a.btn:hover { background: #0056b3; text-decoration: none; }
     </style>
 </head>
 <body>
@@ -62,7 +97,16 @@
                 <li>Fast loading and easy to edit.</li>
             </ul>
 
-            <p>Check out my work on <a href="https://github.com/">GitHub</a>.</p>
+            <p>Check out my work on <a href="https://github.com/skkbios">GitHub</a>.</p>
+
+            <h3>Demos</h3>
+            <div class="demo-grid">
+                <div class="demo-card">
+                    <h4>🤖 KimmBot Upper Body</h4>
+                    <p>Interactive IK / FK demo for a 7-DOF upper-body robot arm. Input a target position to solve inverse kinematics, or drag joint sliders to explore the workspace.</p>
+                    <a class="btn" href="./_demo/robot_controlKimmbot/index.html">Open Demo →</a>
+                </div>
+            </div>
         </main>
 
         <footer>
