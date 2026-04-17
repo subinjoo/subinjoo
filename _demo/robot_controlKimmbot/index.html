@@ -219,7 +219,7 @@ python3 -m http.server 8080</code>
   <span style="margin-left:auto">Three.js r165</span>
 </footer>
 
-<!-- file:// detection (runs before modules load) -->
+<!-- file:// detection + module-failure watchdog (runs before modules load) -->
 <script>
   if (location.protocol === 'file:') {
     document.getElementById('file-warn').style.display = 'flex';
@@ -227,14 +227,34 @@ python3 -m http.server 8080</code>
   function dismissWarn() {
     document.getElementById('file-warn').style.display = 'none';
   }
+
+  // Watchdog: if JS module never marks itself ready within 12 s, show error
+  window._moduleReady = false;
+  setTimeout(function() {
+    if (!window._moduleReady) {
+      var el = document.getElementById('loading-text');
+      if (el) el.textContent = '❌ Three.js failed to load – check browser console (F12)';
+      if (el) el.style.color = '#f85149';
+    }
+  }, 12000);
+
+  // Surface any uncaught module errors
+  window.addEventListener('error', function(e) {
+    var el = document.getElementById('loading-text');
+    if (el) { el.textContent = '❌ JS error: ' + e.message; el.style.color = '#f85149'; }
+  });
+  window.addEventListener('unhandledrejection', function(e) {
+    var el = document.getElementById('loading-text');
+    if (el) { el.textContent = '❌ Module error: ' + (e.reason && e.reason.message || e.reason); el.style.color = '#f85149'; }
+  });
 </script>
 
 <!-- ═══════════════ Three.js ═══════════════ -->
 <script type="importmap">
 {
   "imports": {
-    "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.165.0/examples/jsm/"
+    "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
   }
 }
 </script>
@@ -243,6 +263,7 @@ python3 -m http.server 8080</code>
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLLoader }     from 'three/addons/loaders/STLLoader.js';
+window._moduleReady = true;  // tell watchdog we loaded
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // KINEMATICS DATA — from upperbody_full260128.urdf
