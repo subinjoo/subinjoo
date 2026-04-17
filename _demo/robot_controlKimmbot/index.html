@@ -427,7 +427,7 @@ ctrl.target.set(-0.2,-0.4,0); ctrl.enableDamping=true; ctrl.dampingFactor=0.08;
 
 scene.add(new THREE.AmbientLight(0xffffff,0.6));
 const dl=new THREE.DirectionalLight(0xffffff,1.2); dl.position.set(1,2,1.5); dl.castShadow=true; scene.add(dl);
-scene.add(Object.assign(new THREE.DirectionalLight(0x88bbff,0.35),{position:{set:()=>{}}}) || new THREE.DirectionalLight(0x88bbff,0.35));
+const bl=new THREE.DirectionalLight(0x88bbff,0.35); bl.position.set(0,1,-1); scene.add(bl);
 const fl=new THREE.DirectionalLight(0x88bbff,0.35); fl.position.set(-1,0.5,-1); scene.add(fl);
 
 // Grid
