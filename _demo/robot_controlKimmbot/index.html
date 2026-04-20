@@ -206,7 +206,7 @@ python3 -m http.server 8080</code>
       <div class="ibox">
         <div><strong style="color:#58a6ff">Algorithm</strong> <span>Damped Least Squares</span></div>
         <div><strong style="color:#58a6ff">Source</strong> <span>get_q_desired_R_robust()</span></div>
-        <div><strong style="color:#58a6ff">Jacobian</strong> <span>Analytical WORLD frame (z×(−p))</span></div>
+        <div><strong style="color:#58a6ff">Jacobian</strong> <span>Numerical finite-diff</span></div>
         <div><strong style="color:#58a6ff">Max iter</strong> <span>500 · tol = 0.1 mm</span></div>
       </div>
     </div>
@@ -345,18 +345,6 @@ function fk(q) {
   return POS4(T);
 }
 
-// fkFull: returns EE position AND per-joint world transforms (for analytical Jacobian)
-function fkFull(q) {
-  const Ts=[];
-  let T=I4();
-  for(let i=0;i<7;i++){
-    const j=JR[i];
-    T=M4(T, M4(M4(T4(...j.xyz), RPY4(...j.rpy)), AA4(...j.axis, q[i])));
-    Ts.push([...T]);
-  }
-  return {pos:POS4(T), Ts};
-}
-
 // Startup FK check — expected: [-0.16875, -0.1459, 0.00245]
 {
   const p=fk([0,0,0,0,0,0,0]), ref=[-0.16875,-0.1459,0.00245];
@@ -366,9 +354,7 @@ function fkFull(q) {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// INVERSE KINEMATICS — DLS (matches get_q_desired_R_robust)
-// Analytical WORLD-frame Jacobian: J_i = z_i × (-p_i)
-// where z_i = R_world_i * axis_local,  p_i = joint origin in world frame
+// INVERSE KINEMATICS — DLS (get_q_desired_R_robust)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function gauss3(A,b) {         // solve 3×3 Ax=b via Gaussian elimination
   const m=[[A[0][0],A[0][1],A[0][2],b[0]],
@@ -393,33 +379,24 @@ function gauss3(A,b) {         // solve 3×3 Ax=b via Gaussian elimination
 }
 
 function solveIK(target, q0, maxIter=500) {
-  const eps=1e-4;
+  const eps=1e-4, dlt=1e-6;
   let q=[...q0], errNorm=Infinity, iters=0;
   for(let it=0;it<maxIter;it++){
-    const {pos, Ts}=fkFull(q);
+    const pos=fk(q);
     const err=[pos[0]-target[0], pos[1]-target[1], pos[2]-target[2]];
     errNorm=Math.sqrt(err[0]**2+err[1]**2+err[2]**2);
     iters=it; if(errNorm<eps) break;
     const lam=errNorm<0.05?1e-4:1e-3, dt=errNorm>0.1?0.2:0.1;
-    // Analytical WORLD Jacobian: J_i = z_i × (-p_i)
+    // Numerical Jacobian: J[row=xyz][col=joint]
     const J=[[],[],[]];
     for(let i=0;i<7;i++){
-      const Ti=Ts[i], ax=JR[i].axis;
-      // z_i = R_Ti * ax_local  (3x3 rotation = Ti rows 0-2, cols 0-2)
-      const zx=Ti[0]*ax[0]+Ti[1]*ax[1]+Ti[2]*ax[2];
-      const zy=Ti[4]*ax[0]+Ti[5]*ax[1]+Ti[6]*ax[2];
-      const zz=Ti[8]*ax[0]+Ti[9]*ax[1]+Ti[10]*ax[2];
-      // p_i = Ti[:3,3]
-      const px=Ti[3], py=Ti[7], pz=Ti[11];
-      // z × (-p): cross(z, -p) = cross(-p, z) negated = -(cross(z,p))
-      J[0].push(-(zy*pz-zz*py));
-      J[1].push(-(zz*px-zx*pz));
-      J[2].push(-(zx*py-zy*px));
+      const qp=[...q]; qp[i]+=dlt; const pp=fk(qp);
+      for(let j=0;j<3;j++) J[j].push((pp[j]-pos[j])/dlt);
     }
     // A = J*J' + λ*I₃
     const A=[[0,0,0],[0,0,0],[0,0,0]];
     for(let i=0;i<3;i++){ for(let j=0;j<3;j++) for(let k=0;k<7;k++) A[i][j]+=J[i][k]*J[j][k]; A[i][i]+=lam; }
-    // v = A⁻¹(-err) → delta_q = J'*v
+    // v = (A)⁻¹(-err) → delta_q = J'*v
     const v=gauss3(A,[-err[0],-err[1],-err[2]]);
     for(let i=0;i<7;i++){
       let dq=0; for(let j=0;j<3;j++) dq+=J[j][i]*v[j];
@@ -654,7 +631,7 @@ window.doIK=()=>{
 
   setTimeout(()=>{
     const t0=performance.now();
-    const {q,errNorm,iters}=solveIK([x,y,z],[0,0,0,0,0,0,0]);
+    const {q,errNorm,iters}=solveIK([x,y,z],[...Q]);
     const ms=(performance.now()-t0).toFixed(1);
 
     applyQ(q);
