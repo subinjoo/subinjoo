@@ -185,6 +185,10 @@ python3 -m http.server 8080</code>
         <div class="xyz-item"><label>Z (m)</label>
           <input id="ik-z" type="number" step="0.01" value="-0.393"></div>
       </div>
+      <div class="xyz-row">
+        <div class="xyz-item"><label>EE Local Y Offset (m)</label>
+          <input id="ik-offset-y" type="number" step="0.01" value="0.0"></div>
+      </div>
       <button class="btn btn-primary" id="ik-btn" onclick="doIK()">Solve IK &amp; Apply</button>
 
       <div id="ik-status" class="sbox" style="display:none"></div>
@@ -205,9 +209,10 @@ python3 -m http.server 8080</code>
       <hr>
       <div class="ibox">
         <div><strong style="color:#58a6ff">Algorithm</strong> <span>Damped Least Squares</span></div>
-        <div><strong style="color:#58a6ff">Source</strong> <span>get_q_desired_R_robust()</span></div>
+        <div><strong style="color:#58a6ff">Source</strong> <span>get_q_desired_R_robust2()</span></div>
         <div><strong style="color:#58a6ff">Jacobian</strong> <span>Numerical finite-diff</span></div>
         <div><strong style="color:#58a6ff">Max iter</strong> <span>500 · tol = 0.1 mm</span></div>
+        <div><strong style="color:#58a6ff">Offset</strong> <span>local Y-axis (R_EE·[0,oy,0])</span></div>
       </div>
     </div>
   </div>
@@ -336,14 +341,15 @@ const POS4=T=>[T[3],T[7],T[11]]; // translation from 4×4
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // FORWARD KINEMATICS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function fk(q) {
+function fkFull(q) {    // returns full 4×4 transform
   let T=I4();
   for(let i=0;i<7;i++) {
     const j=JR[i];
     T=M4(T, M4(M4(T4(...j.xyz), RPY4(...j.rpy)), AA4(...j.axis, q[i])));
   }
-  return POS4(T);
+  return T;
 }
+function fk(q) { return POS4(fkFull(q)); }
 
 // Startup FK check — expected: [-0.16875, -0.1459, 0.00245]
 {
@@ -397,6 +403,39 @@ function solveIK(target, q0, maxIter=500) {
     const A=[[0,0,0],[0,0,0],[0,0,0]];
     for(let i=0;i<3;i++){ for(let j=0;j<3;j++) for(let k=0;k<7;k++) A[i][j]+=J[i][k]*J[j][k]; A[i][i]+=lam; }
     // v = (A)⁻¹(-err) → delta_q = J'*v
+    const v=gauss3(A,[-err[0],-err[1],-err[2]]);
+    for(let i=0;i<7;i++){
+      let dq=0; for(let j=0;j<3;j++) dq+=J[j][i]*v[j];
+      q[i]=Math.max(LMIN[i],Math.min(LMAX[i], q[i]+dq*dt));
+    }
+  }
+  return {q, errNorm, iters};
+}
+
+// IK with local-Y offset — mirrors get_q_desired_R_robust2
+// offset_world = R_EE @ [0, offset_y, 0]  (col-1 of rotation × offset_y)
+function solveIK2(target, q0, offset_y=0, maxIter=500) {
+  if(offset_y===0) return solveIK(target, q0, maxIter);
+  const eps=1e-4, dlt=1e-6;
+  let q=[...q0], errNorm=Infinity, iters=0;
+  for(let it=0;it<maxIter;it++){
+    const T=fkFull(q);
+    // virtual EE = actual EE + R_EE * [0, offset_y, 0]
+    // col-1 of row-major T: T[1], T[5], T[9]
+    const vp=[T[3]+T[1]*offset_y, T[7]+T[5]*offset_y, T[11]+T[9]*offset_y];
+    const err=[vp[0]-target[0], vp[1]-target[1], vp[2]-target[2]];
+    errNorm=Math.sqrt(err[0]**2+err[1]**2+err[2]**2);
+    iters=it; if(errNorm<eps) break;
+    const lam=errNorm<0.05?1e-4:1e-3, dt=errNorm>0.1?0.2:0.1;
+    const J=[[],[],[]];
+    for(let i=0;i<7;i++){
+      const qp=[...q]; qp[i]+=dlt;
+      const Tp=fkFull(qp);
+      const vpp=[Tp[3]+Tp[1]*offset_y, Tp[7]+Tp[5]*offset_y, Tp[11]+Tp[9]*offset_y];
+      for(let j=0;j<3;j++) J[j].push((vpp[j]-vp[j])/dlt);
+    }
+    const A=[[0,0,0],[0,0,0],[0,0,0]];
+    for(let i=0;i<3;i++){ for(let j=0;j<3;j++) for(let k=0;k<7;k++) A[i][j]+=J[i][k]*J[j][k]; A[i][i]+=lam; }
     const v=gauss3(A,[-err[0],-err[1],-err[2]]);
     for(let i=0;i<7;i++){
       let dq=0; for(let j=0;j<3;j++) dq+=J[j][i]*v[j];
@@ -626,12 +665,13 @@ window.doIK=()=>{
   const x=+document.getElementById('ik-x').value||0;
   const y=+document.getElementById('ik-y').value||0;
   const z=+document.getElementById('ik-z').value||0;
+  const oy=parseFloat(document.getElementById('ik-offset-y').value)||0;
   const btn=document.getElementById('ik-btn');
   btn.disabled=true; btn.textContent='Solving…';
 
   setTimeout(()=>{
     const t0=performance.now();
-    const {q,errNorm,iters}=solveIK([x,y,z],[...Q]);
+    const {q,errNorm,iters}=solveIK2([x,y,z],[...Q],oy);
     const ms=(performance.now()-t0).toFixed(1);
 
     applyQ(q);
