@@ -179,15 +179,20 @@ python3 -m http.server 8080</code>
       <h3>Target EE Position (meters)</h3>
       <div class="xyz-row">
         <div class="xyz-item"><label>X (m)</label>
-          <input id="ik-x" type="number" step="0.01" value="-0.169"></div>
+          <input id="ik-x" type="number" step="0.01" value="-0.1688"></div>
         <div class="xyz-item"><label>Y (m)</label>
-          <input id="ik-y" type="number" step="0.01" value="-0.300"></div>
+          <input id="ik-y" type="number" step="0.01" value="-0.1459"></div>
         <div class="xyz-item"><label>Z (m)</label>
-          <input id="ik-z" type="number" step="0.01" value="-0.393"></div>
+          <input id="ik-z" type="number" step="0.01" value="0.0025"></div>
       </div>
+      <h3>EE Local Axis Offset (meters)</h3>
       <div class="xyz-row">
-        <div class="xyz-item"><label>EE Local X Offset (m)</label>
+        <div class="xyz-item"><label>X offset</label>
           <input id="ik-offset-x" type="number" step="0.01" value="0.0"></div>
+        <div class="xyz-item"><label>Y offset</label>
+          <input id="ik-offset-y" type="number" step="0.01" value="0.0"></div>
+        <div class="xyz-item"><label>Z offset</label>
+          <input id="ik-offset-z" type="number" step="0.01" value="0.0"></div>
       </div>
       <button class="btn btn-primary" id="ik-btn" onclick="doIK()">Solve IK &amp; Apply</button>
 
@@ -212,7 +217,7 @@ python3 -m http.server 8080</code>
         <div><strong style="color:#58a6ff">Source</strong> <span>get_q_desired_R_robust2()</span></div>
         <div><strong style="color:#58a6ff">Jacobian</strong> <span>Numerical finite-diff</span></div>
         <div><strong style="color:#58a6ff">Max iter</strong> <span>500 · tol = 0.1 mm</span></div>
-        <div><strong style="color:#58a6ff">Offset</strong> <span>local X-axis (R_EE·[ox,0,0])</span></div>
+        <div><strong style="color:#58a6ff">Offset</strong> <span>local XYZ (R_EE·[ox,oy,oz])</span></div>
       </div>
     </div>
   </div>
@@ -412,17 +417,21 @@ function solveIK(target, q0, maxIter=500) {
   return {q, errNorm, iters};
 }
 
-// IK with local-X offset — mirrors get_q_desired_R_robust2
-// offset_world = R_EE @ [offset_x, 0, 0]  (col-0 of rotation × offset_x)
-function solveIK2(target, q0, offset_x=0, maxIter=500) {
-  if(offset_x===0) return solveIK(target, q0, maxIter);
+// IK with local X/Y/Z offset — mirrors get_q_desired_R_robust2
+// offset_world = R_EE @ [ox, oy, oz]
+// row-major 4×4 T: col-0=[T0,T4,T8], col-1=[T1,T5,T9], col-2=[T2,T6,T10]
+function solveIK2(target, q0, ox=0, oy=0, oz=0, maxIter=500) {
+  if(ox===0 && oy===0 && oz===0) return solveIK(target, q0, maxIter);
   const eps=1e-4, dlt=1e-6;
   let q=[...q0], errNorm=Infinity, iters=0;
+  const vEE=(T)=>[
+    T[3] + T[0]*ox + T[1]*oy + T[2]*oz,
+    T[7] + T[4]*ox + T[5]*oy + T[6]*oz,
+    T[11]+ T[8]*ox + T[9]*oy + T[10]*oz
+  ];
   for(let it=0;it<maxIter;it++){
     const T=fkFull(q);
-    // virtual EE = actual EE + R_EE * [offset_x, 0, 0]
-    // col-0 of row-major T: T[0], T[4], T[8]
-    const vp=[T[3]+T[0]*offset_x, T[7]+T[4]*offset_x, T[11]+T[8]*offset_x];
+    const vp=vEE(T);
     const err=[vp[0]-target[0], vp[1]-target[1], vp[2]-target[2]];
     errNorm=Math.sqrt(err[0]**2+err[1]**2+err[2]**2);
     iters=it; if(errNorm<eps) break;
@@ -430,8 +439,7 @@ function solveIK2(target, q0, offset_x=0, maxIter=500) {
     const J=[[],[],[]];
     for(let i=0;i<7;i++){
       const qp=[...q]; qp[i]+=dlt;
-      const Tp=fkFull(qp);
-      const vpp=[Tp[3]+Tp[0]*offset_x, Tp[7]+Tp[4]*offset_x, Tp[11]+Tp[8]*offset_x];
+      const vpp=vEE(fkFull(qp));
       for(let j=0;j<3;j++) J[j].push((vpp[j]-vp[j])/dlt);
     }
     const A=[[0,0,0],[0,0,0],[0,0,0]];
@@ -665,13 +673,15 @@ window.doIK=()=>{
   const x=+document.getElementById('ik-x').value||0;
   const y=+document.getElementById('ik-y').value||0;
   const z=+document.getElementById('ik-z').value||0;
-  const oy=parseFloat(document.getElementById('ik-offset-x').value)||0;
+  const ox=parseFloat(document.getElementById('ik-offset-x').value)||0;
+  const oy=parseFloat(document.getElementById('ik-offset-y').value)||0;
+  const oz=parseFloat(document.getElementById('ik-offset-z').value)||0;
   const btn=document.getElementById('ik-btn');
   btn.disabled=true; btn.textContent='Solving…';
 
   setTimeout(()=>{
     const t0=performance.now();
-    const {q,errNorm,iters}=solveIK2([x,y,z],[...Q],oy);
+    const {q,errNorm,iters}=solveIK2([x,y,z],[...Q],ox,oy,oz);
     const ms=(performance.now()-t0).toFixed(1);
 
     applyQ(q);
