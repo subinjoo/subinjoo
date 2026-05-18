@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salivary Scintigraphy Point Labeler</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --accent: #0f766e;
+            --accent-dark: #115e59;
+            --border: #d1d5db;
+            --panel: #ffffff;
+            --soft: #f3f7f7;
+            --text: #172026;
+            --muted: #64748b;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text);
+            background: #eef3f4;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            padding: 18px 24px;
+            border-bottom: 1px solid var(--border);
+            background: var(--panel);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        h1 {
+            margin: 0;
+            font-size: 1.15rem;
+            letter-spacing: 0;
+        }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        main {
+            display: grid;
+            grid-template-columns: 320px minmax(0, 1fr);
+            gap: 18px;
+            padding: 18px;
+        }
+        aside, section {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        aside {
+            padding: 16px;
+            height: fit-content;
+            position: sticky;
+            top: 76px;
+        }
+        label {
+            display: block;
+            margin: 12px 0 6px;
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+        input[type="file"], input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: #fff;
+            color: var(--text);
+        }
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        button {
+            border: 1px solid var(--accent);
+            border-radius: 6px;
+            padding: 8px 10px;
+            background: var(--accent);
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        button:hover { background: var(--accent-dark); }
+        button.secondary {
+            background: #fff;
+            color: var(--accent);
+        }
+        button.secondary:hover { background: var(--soft); }
+        button.danger {
+            border-color: #dc2626;
+            background: #dc2626;
+        }
+        button.danger:hover { background: #b91c1c; }
+        .hint {
+            margin: 10px 0 0;
+            color: var(--muted);
+            font-size: 0.82rem;
+            line-height: 1.45;
+        }
+        .stats {
+            margin-top: 14px;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            background: #f8fafc;
+            font-size: 0.85rem;
+        }
+        .workspace {
+            padding: 14px;
+        }
+        .frame-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 14px;
+        }
+        .frame {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: #fbfdfe;
+            overflow: hidden;
+        }
+        .frame.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.18);
+        }
+        .frame-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.82rem;
+            font-weight: 700;
+        }
+        .canvas-wrap {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background: #111827;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+        .empty {
+            display: grid;
+            place-items: center;
+            min-height: 60vh;
+            color: var(--muted);
+            text-align: center;
+            padding: 40px;
+        }
+        .point-list {
+            margin-top: 12px;
+            max-height: 220px;
+            overflow: auto;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+        .point-row {
+            display: grid;
+            grid-template-columns: 52px 1fr 74px;
+            gap: 8px;
+            align-items: center;
+            padding: 7px 8px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 0.78rem;
+        }
+        .point-row:last-child { border-bottom: 0; }
+        .point-row button {
+            padding: 4px 6px;
+            font-size: 0.72rem;
+        }
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 34px;
+            padding: 2px 6px;
+            border-radius: 999px;
+            background: #ccfbf1;
+            color: #115e59;
+            font-size: 0.72rem;
+            font-weight: 800;
+        }
+        @media (max-width: 900px) {
+            main { grid-template-columns: 1fr; }
+            aside { position: static; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Salivary Scintigraphy Point Labeler</h1>
+        <a href="../../index.html">Back to Home</a>
+    </header>
+
+    <main>
+        <aside>
+            <label for="imageInput">Upload 11-frame report image</label>
+            <input id="imageInput" type="file" accept="image/*">
+            <p class="hint">The uploaded image is split into a 3 x 4 grid. The first 11 cells are labeled 0-10.</p>
+
+            <label for="caseId">Case ID</label>
+            <input id="caseId" type="text" placeholder="Auto-filled from filename">
+
+            <div class="row">
+                <div>
+                    <label for="pointLabel">Point</label>
+                    <select id="pointLabel">
+                        <option value="P0">P0</option>
+                        <option value="P1">P1</option>
+                        <option value="P2">P2</option>
+                        <option value="P3">P3</option>
+                        <option value="P4">P4</option>
+                        <option value="P5">P5</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="roiRadius">ROI radius</label>
+                    <input id="roiRadius" type="number" min="1" max="80" value="10">
+                </div>
+            </div>
+
+            <label for="activeFrame">Active frame</label>
+            <select id="activeFrame"></select>
+
+            <div class="controls">
+                <button id="downloadCsv">Download CSV</button>
+                <button id="downloadJson" class="secondary">Download JSON</button>
+                <button id="undoPoint" class="secondary">Undo last</button>
+                <button id="clearFrame" class="danger">Clear frame</button>
+                <button id="clearAll" class="danger">Clear all</button>
+                <button id="redrawAll" class="secondary">Redraw</button>
+            </div>
+
+            <div class="stats">
+                <div><strong>Total points:</strong> <span id="totalPoints">0</span></div>
+                <div><strong>Selected point:</strong> <span id="selectedPoint">none</span></div>
+                <div class="hint">Click a point in a frame to select it. Press Delete/Backspace or use the row button to remove it.</div>
+            </div>
+
+            <div class="point-list" id="pointList"></div>
+        </aside>
+
+        <section class="workspace">
+            <div id="emptyState" class="empty">
+                <div>
+                    <h2>Upload a report image to start labeling</h2>
+                    <p>Click each sub-image to add gland center points. Points can be selected and deleted before CSV export.</p>
+                </div>
+            </div>
+            <div id="frameGrid" class="frame-grid" hidden></div>
+        </section>
+    </main>
+
+    <script>
+        const frameLabels = [
+            "5M", "10M", "20M", "20M(RL)", "20M(LL)",
+            "40M", "40M(RL)", "40M(LL)", "W.O", "W.O(RL)", "W.O(LL)"
+        ];
+        const colors = ["#f97316", "#2563eb", "#16a34a", "#c026d3", "#eab308", "#0f766e"];
+        const imageInput = document.getElementById("imageInput");
+        const caseIdInput = document.getElementById("caseId");
+        const pointLabel = document.getElementById("pointLabel");
+        const roiRadius = document.getElementById("roiRadius");
+        const activeFrame = document.getElementById("activeFrame");
+        const frameGrid = document.getElementById("frameGrid");
+        const emptyState = document.getElementById("emptyState");
+        const pointList = document.getElementById("pointList");
+        const totalPoints = document.getElementById("totalPoints");
+        const selectedPointText = document.getElementById("selectedPoint");
+
+        const state = {
+            fileName: "",
+            frames: [],
+            points: [],
+            selectedPointId: null,
+            activeFrame: 0,
+            nextId: 1
+        };
+
+        frameLabels.forEach((label, index) => {
+            const option = document.createElement("option");
+            option.value = String(index);
+            option.textContent = `${index}: ${label}`;
+            activeFrame.appendChild(option);
+        });
+
+        imageInput.addEventListener("change", handleUpload);
+        activeFrame.addEventListener("change", () => {
+            state.activeFrame = Number(activeFrame.value);
+            drawAll();
+        });
+        roiRadius.addEventListener("change", drawAll);
+        document.getElementById("downloadCsv").addEventListener("click", downloadCsv);
+        document.getElementById("downloadJson").addEventListener("click", downloadJson);
+        document.getElementById("undoPoint").addEventListener("click", undoLastPoint);
+        document.getElementById("clearFrame").addEventListener("click", clearActiveFrame);
+        document.getElementById("clearAll").addEventListener("click", clearAllPoints);
+        document.getElementById("redrawAll").addEventListener("click", drawAll);
+        document.addEventListener("keydown", event => {
+            if ((event.key === "Delete" || event.key === "Backspace") && state.selectedPointId) {
+                event.preventDefault();
+                deletePoint(state.selectedPointId);
+            }
+        });
+
+        function handleUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            state.fileName = file.name;
+            caseIdInput.value = file.name.replace(/\.[^.]+$/, "");
+            const img = new Image();
+            img.onload = () => splitImageIntoFrames(img);
+            img.src = URL.createObjectURL(file);
+        }
+
+        function splitImageIntoFrames(img) {
+            const columns = 4;
+            const rows = 3;
+            const cellWidth = Math.floor(img.naturalWidth / columns);
+            const cellHeight = Math.floor(img.naturalHeight / rows);
+            state.frames = [];
+            state.points = [];
+            state.selectedPointId = null;
+            state.nextId = 1;
+
+            for (let i = 0; i < 11; i++) {
+                const sourceCol = i % columns;
+                const sourceRow = Math.floor(i / columns);
+                const offscreen = document.createElement("canvas");
+                offscreen.width = 256;
+                offscreen.height = 256;
+                const ctx = offscreen.getContext("2d");
+                ctx.drawImage(
+                    img,
+                    sourceCol * cellWidth,
+                    sourceRow * cellHeight,
+                    cellWidth,
+                    cellHeight,
+                    0,
+                    0,
+                    256,
+                    256
+                );
+                state.frames.push({ canvas: offscreen, label: frameLabels[i] });
+            }
+            buildFrameGrid();
+            drawAll();
+        }
+
+        function buildFrameGrid() {
+            frameGrid.innerHTML = "";
+            emptyState.hidden = true;
+            frameGrid.hidden = false;
+            state.frames.forEach((frame, index) => {
+                const card = document.createElement("div");
+                card.className = "frame";
+                card.dataset.frameIndex = index;
+
+                const title = document.createElement("div");
+                title.className = "frame-title";
+                title.innerHTML = `<span>${index}: ${frame.label}</span><span class="pill" id="count-${index}">0</span>`;
+                card.appendChild(title);
+
+                const wrap = document.createElement("div");
+                wrap.className = "canvas-wrap";
+                const canvas = document.createElement("canvas");
+                canvas.width = 256;
+                canvas.height = 256;
+                canvas.dataset.frameIndex = index;
+                canvas.addEventListener("click", onCanvasClick);
+                wrap.appendChild(canvas);
+                card.appendChild(wrap);
+                frameGrid.appendChild(card);
+            });
+        }
+
+        function onCanvasClick(event) {
+            const canvas = event.currentTarget;
+            const frameIndex = Number(canvas.dataset.frameIndex);
+            const rect = canvas.getBoundingClientRect();
+            const x = (event.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (event.clientY - rect.top) * (canvas.height / rect.height);
+            const hit = findPointNear(frameIndex, x, y);
+            state.activeFrame = frameIndex;
+            activeFrame.value = String(frameIndex);
+            if (hit) {
+                state.selectedPointId = hit.id;
+            } else {
+                const label = pointLabel.value;
+                state.points.push({
+                    id: state.nextId++,
+                    case_id: caseIdInput.value.trim(),
+                    image_file: state.fileName,
+                    frame_index: frameIndex,
+                    frame_label: frameLabels[frameIndex],
+                    point_label: label,
+                    x: Number(x.toFixed(2)),
+                    y: Number(y.toFixed(2)),
+                    roi_radius: Number(roiRadius.value || 10)
+                });
+                state.selectedPointId = state.points[state.points.length - 1].id;
+            }
+            drawAll();
+        }
+
+        function findPointNear(frameIndex, x, y) {
+            const threshold = 8;
+            return state.points.find(point => {
+                if (point.frame_index !== frameIndex) return false;
+                return Math.hypot(point.x - x, point.y - y) <= threshold;
+            });
+        }
+
+        function drawAll() {
+            document.querySelectorAll(".frame").forEach(card => {
+                card.classList.toggle("active", Number(card.dataset.frameIndex) === state.activeFrame);
+            });
+            state.frames.forEach((frame, index) => {
+                const canvas = frameGrid.querySelector(`canvas[data-frame-index="${index}"]`);
+                if (!canvas) return;
+                const ctx = canvas.getContext("2d");
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(frame.canvas, 0, 0);
+                const points = state.points.filter(point => point.frame_index === index);
+                points.forEach(point => drawPoint(ctx, point));
+                const count = document.getElementById(`count-${index}`);
+                if (count) count.textContent = points.length;
+            });
+            renderPointList();
+        }
+
+        function drawPoint(ctx, point) {
+            const index = Number(point.point_label.replace("P", "")) || 0;
+            const color = colors[index % colors.length];
+            const radius = Number(point.roi_radius || roiRadius.value || 10);
+            ctx.save();
+            ctx.strokeStyle = point.id === state.selectedPointId ? "#ffffff" : color;
+            ctx.lineWidth = point.id === state.selectedPointId ? 3 : 2;
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.font = "bold 12px sans-serif";
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = "#111827";
+            ctx.strokeText(point.point_label, point.x + 7, point.y - 7);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(point.point_label, point.x + 7, point.y - 7);
+            ctx.restore();
+        }
+
+        function renderPointList() {
+            totalPoints.textContent = state.points.length;
+            const selected = state.points.find(point => point.id === state.selectedPointId);
+            selectedPointText.textContent = selected ? `${selected.frame_index}:${selected.point_label} (${selected.x}, ${selected.y})` : "none";
+            pointList.innerHTML = "";
+            state.points
+                .slice()
+                .sort((a, b) => a.frame_index - b.frame_index || a.id - b.id)
+                .forEach(point => {
+                    const row = document.createElement("div");
+                    row.className = "point-row";
+                    row.innerHTML = `
+                        <span class="pill">${point.frame_index}:${point.point_label}</span>
+                        <span>x=${point.x}, y=${point.y}</span>
+                    `;
+                    const btn = document.createElement("button");
+                    btn.className = "danger";
+                    btn.textContent = "Delete";
+                    btn.addEventListener("click", () => deletePoint(point.id));
+                    row.addEventListener("click", () => {
+                        state.selectedPointId = point.id;
+                        state.activeFrame = point.frame_index;
+                        activeFrame.value = String(point.frame_index);
+                        drawAll();
+                    });
+                    row.appendChild(btn);
+                    pointList.appendChild(row);
+                });
+        }
+
+        function deletePoint(id) {
+            state.points = state.points.filter(point => point.id !== id);
+            if (state.selectedPointId === id) state.selectedPointId = null;
+            drawAll();
+        }
+
+        function undoLastPoint() {
+            const point = state.points.pop();
+            if (point && state.selectedPointId === point.id) state.selectedPointId = null;
+            drawAll();
+        }
+
+        function clearActiveFrame() {
+            state.points = state.points.filter(point => point.frame_index !== state.activeFrame);
+            state.selectedPointId = null;
+            drawAll();
+        }
+
+        function clearAllPoints() {
+            if (!state.points.length || confirm("Delete all labeled points?")) {
+                state.points = [];
+                state.selectedPointId = null;
+                drawAll();
+            }
+        }
+
+        function csvEscape(value) {
+            const text = String(value ?? "");
+            return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+        }
+
+        function downloadCsv() {
+            const headers = ["case_id", "image_file", "frame_index", "frame_label", "point_label", "x", "y", "roi_radius"];
+            const rows = state.points
+                .slice()
+                .sort((a, b) => a.frame_index - b.frame_index || a.id - b.id)
+                .map(point => headers.map(header => csvEscape(point[header])).join(","));
+            const csv = [headers.join(","), ...rows].join("\n");
+            downloadBlob(csv, `${caseIdInput.value || "salivary_labels"}.csv`, "text/csv");
+        }
+
+        function downloadJson() {
+            const payload = {
+                case_id: caseIdInput.value.trim(),
+                image_file: state.fileName,
+                frame_labels: frameLabels,
+                points: state.points.slice().sort((a, b) => a.frame_index - b.frame_index || a.id - b.id)
+            };
+            downloadBlob(JSON.stringify(payload, null, 2), `${caseIdInput.value || "salivary_labels"}.json`, "application/json");
+        }
+
+        function downloadBlob(content, filename, type) {
+            const blob = new Blob([content], { type });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(link.href), 500);
+        }
+    </script>
+</body>
+</html>
