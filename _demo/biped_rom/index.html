@@ -293,13 +293,14 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const s45 = Math.SQRT1_2;            // 1/√2
 
-// Hip joint axes (in local parent frame, XY plane, Y-up)
-// Normal hip pitch = X axis [1,0,0]. Rotate -45° around Z:
-//   J1 axis = Rz(-45°)·[1,0,0] = [1/√2, -1/√2, 0]
-//   J2 axis = Rz(-45°)·J1      = Rz(-90°)·[1,0,0] = [0, -1, 0]  (−Y, 지면 수직 아래)
-const AX_J1 = new THREE.Vector3( s45, -s45, 0);  // hip pitch rotated -45° around Z
-const AX_J2 = new THREE.Vector3( 0,   -1,   0);  // −Y axis (perpendicular to ground, downward)
-const AX_K  = new THREE.Vector3( 1,    0,   0);  // knee pitch (X axis)
+// Hip joint axes (XY plane, Y-up)
+// Right leg: normal hip pitch Rz(−45°) → J1=[1/√2,−1/√2,0], J2=[0,−1,0]
+// Left  leg: normal hip pitch Rz(+45°) → J1=[1/√2,+1/√2,0], J2=[0,+1,0]
+const R_AX_J1 = new THREE.Vector3( s45, -s45, 0);  // right J1: Rz(-45°)·X
+const R_AX_J2 = new THREE.Vector3( 0,   -1,   0);  // right J2: Rz(-90°)·X = -Y
+const L_AX_J1 = new THREE.Vector3( s45,  s45, 0);  // left  J1: Rz(+45°)·X
+const L_AX_J2 = new THREE.Vector3( 0,    1,   0);  // left  J2: Rz(+90°)·X = +Y
+const AX_K    = new THREE.Vector3( 1,    0,   0);  // knee pitch (X axis)
 
 const J12_OFF  = 0.10;   // J1 → J2 offset distance along AX_J1 (m)
 const L_UPPER  = 0.40;   // J2 → knee (m)  — user specified 40 cm
@@ -356,7 +357,7 @@ scene.add(pelvisMesh);
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // BUILD LEG
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function buildLeg(hipX, segColor) {
+function buildLeg(hipX, segColor, axJ1, axJ2) {
   const mat  = new THREE.MeshStandardMaterial({color:segColor, metalness:0.25, roughness:0.55});
   const jMat = new THREE.MeshStandardMaterial({color:COL_J, metalness:0.55, roughness:0.3, emissive:0x111111});
 
@@ -377,14 +378,14 @@ function buildLeg(hipX, segColor) {
     new THREE.CylinderGeometry(0.016, 0.016, J12_OFF - 0.01, 10),
     mat
   );
-  // orient cylinder along AX_J1 (default Y axis → AX_J1 direction)
-  linkMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), AX_J1.clone().normalize());
-  linkMesh.position.copy(AX_J1.clone().normalize().multiplyScalar(J12_OFF / 2));
+  // orient cylinder along axJ1 (default Y axis → axJ1 direction)
+  linkMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axJ1.clone().normalize());
+  linkMesh.position.copy(axJ1.clone().normalize().multiplyScalar(J12_OFF / 2));
   g1.add(linkMesh);
 
-  // J2 fixed frame: 10 cm along AX_J1 from J1 (child of g1 → follows J1 rotation)
+  // J2 fixed frame: 10 cm along axJ1 from J1 (child of g1 → follows J1 rotation)
   const j2Fixed = new THREE.Group();
-  j2Fixed.position.copy(AX_J1.clone().normalize().multiplyScalar(J12_OFF));
+  j2Fixed.position.copy(axJ1.clone().normalize().multiplyScalar(J12_OFF));
   g1.add(j2Fixed);
 
   // J2 joint sphere marker
@@ -441,16 +442,15 @@ function buildLeg(hipX, segColor) {
   // ── Axis indicator arrows ──
   // J1 axis arrow (yellow) — fixed at hip root, shows J1 axis direction
   const arr1 = new THREE.ArrowHelper(
-    AX_J1.clone().normalize(),
+    axJ1.clone().normalize(),
     new THREE.Vector3(0, 0, 0),
     0.095, 0xffcc00, 0.028, 0.016
   );
   root.add(arr1);
 
-  // J2 axis arrow (green) — at j2Fixed (10cm below J1, follows J1 rotation)
-  // shows how J2's world axis changes as J1 rotates
+  // J2 axis arrow (green) — at j2Fixed (follows J1 rotation)
   const arr2 = new THREE.ArrowHelper(
-    AX_J2.clone().normalize(),
+    axJ2.clone().normalize(),
     new THREE.Vector3(0, 0, 0),
     0.095, 0x00ff99, 0.028, 0.016
   );
@@ -468,11 +468,11 @@ function buildLeg(hipX, segColor) {
   const footMarker = new THREE.Object3D();
   footG.add(footMarker);
 
-  return { root, g1, g2, gK, footMarker };
+  return { root, g1, g2, gK, footMarker, axJ1, axJ2 };
 }
 
-const legR = buildLeg( HIP_W, COL_R);
-const legL = buildLeg(-HIP_W, COL_L);
+const legR = buildLeg( HIP_W, COL_R, R_AX_J1, R_AX_J2);
+const legL = buildLeg(-HIP_W, COL_L, L_AX_J1, L_AX_J2);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // JOINT STATE
@@ -485,9 +485,9 @@ function applyJoint(id, deg) {
   const isRight = id[0] === 'r';
   const leg = isRight ? legR : legL;
   const jKey = id.slice(1);   // 'j1', 'j2', 'k'
-  if (jKey === 'j1') leg.g1.setRotationFromAxisAngle(AX_J1, rad);
-  if (jKey === 'j2') leg.g2.setRotationFromAxisAngle(AX_J2, rad);
-  if (jKey === 'k' ) leg.gK.setRotationFromAxisAngle(AX_K,  rad);
+  if (jKey === 'j1') leg.g1.setRotationFromAxisAngle(leg.axJ1, rad);
+  if (jKey === 'j2') leg.g2.setRotationFromAxisAngle(leg.axJ2, rad);
+  if (jKey === 'k' ) leg.gK.setRotationFromAxisAngle(AX_K,     rad);
   updateFootDisplay();
 }
 
