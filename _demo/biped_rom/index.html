@@ -298,7 +298,7 @@ const s45 = Math.SQRT1_2;            // 1/√2
 // Left  leg: normal hip pitch Rz(+45°) → J1=[1/√2,+1/√2,0], J2=[0,+1,0]
 const R_AX_J1 = new THREE.Vector3( s45, -s45, 0);  // right J1: Rz(-45°)·X
 const R_AX_J2 = new THREE.Vector3( 0,   -1,   0);  // right J2: Rz(-90°)·X = -Y
-const L_AX_J1 = new THREE.Vector3( s45,  s45, 0);  // left  J1: Rz(+45°)·X
+const L_AX_J1 = new THREE.Vector3(-s45, -s45, 0);  // left  J1: Rz(-135°)·X
 const L_AX_J2 = new THREE.Vector3( 0,    1,   0);  // left  J2: Rz(+90°)·X = +Y
 const AX_K    = new THREE.Vector3( 1,    0,   0);  // knee pitch (X axis)
 
