@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Biped ROM – Diagonal Hip (2DOF) + Knee (1DOF)</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0d1117;
+       color: #e6edf3; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+header { background: #161b22; border-bottom: 1px solid #30363d;
+         padding: 8px 18px; display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+header h1 { font-size: 1.05rem; color: #58a6ff; letter-spacing: 0.04em; }
+header .sub { font-size: 0.75rem; color: #8b949e; }
+header .badge { margin-left: auto; background: #1f6feb22; border: 1px solid #1f6feb44;
+                color: #58a6ff; padding: 3px 10px; border-radius: 20px; font-size: 0.7rem; }
+
+#main { display: flex; flex: 1; overflow: hidden; }
+
+#viewport { flex: 1; position: relative; overflow: hidden; }
+#viewport canvas { display: block; }
+
+/* foot overlay */
+#foot-label { position: absolute; top: 10px; left: 10px; background: #161b22cc;
+              border: 1px solid #30363d; border-radius: 6px; padding: 8px 12px;
+              font-size: 0.73rem; line-height: 2.0; pointer-events: none; font-family: monospace; }
+#foot-label .lbl  { color: #8b949e; }
+#foot-label .vr   { color: #ff7043; }
+#foot-label .vl   { color: #4fc3f7; }
+
+/* legend overlay */
+#legend { position: absolute; bottom: 10px; left: 10px; background: #161b22cc;
+          border: 1px solid #30363d; border-radius: 6px; padding: 7px 11px;
+          font-size: 0.68rem; line-height: 1.9; pointer-events: none; font-family: monospace; }
+#legend .ax1 { color: #ffcc00; } #legend .ax2 { color: #00ff99; } #legend .axk { color: #58a6ff; }
+#legend .lr  { color: #ff7043; } #legend .ll  { color: #4fc3f7; }
+
+/* panel */
+#panel { width: 300px; flex-shrink: 0; background: #161b22;
+         border-left: 1px solid #30363d; display: flex; flex-direction: column; overflow: hidden; }
+
+.tabs { display: flex; border-bottom: 1px solid #30363d; flex-shrink: 0; }
+.tab-btn { flex: 1; padding: 9px 4px; background: none; border: none; color: #8b949e;
+           font-size: 0.78rem; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+.tab-btn:hover { color: #e6edf3; background: #21262d22; }
+.tab-btn.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+
+.tab-content { flex: 1; overflow-y: auto; padding: 12px; display: none; }
+.tab-content.active { display: block; }
+.tab-content::-webkit-scrollbar { width: 5px; }
+.tab-content::-webkit-scrollbar-track { background: #0d1117; }
+.tab-content::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+
+h3 { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em;
+     color: #8b949e; margin-bottom: 8px; margin-top: 8px; }
+
+.joint-row { margin-bottom: 10px; }
+.joint-row > label { display: flex; justify-content: space-between; align-items: center;
+                     font-size: 0.75rem; margin-bottom: 3px; }
+.jname { font-weight: 600; font-family: monospace; font-size: 0.78rem; }
+.jname.r { color: #ff7043; } .jname.l { color: #4fc3f7; }
+.jdesc { color: #8b949e; font-size: 0.67rem; }
+.jval  { color: #3fb950; font-family: monospace; font-size: 0.78rem; background: #0d1117;
+         border: 1px solid #30363d; border-radius: 4px; width: 58px; padding: 2px 4px; text-align: right; }
+.jval:focus { outline: none; border-color: #58a6ff; }
+input[type=range] { width: 100%; accent-color: #58a6ff; cursor: pointer; }
+input[type=range].r { accent-color: #ff7043; }
+input[type=range].l { accent-color: #4fc3f7; }
+
+.sbox { background: #0d1117; border: 1px solid #30363d; border-radius: 5px;
+        padding: 8px 10px; font-size: 0.74rem; font-family: monospace;
+        margin-bottom: 10px; line-height: 2.0; }
+.val-g { color: #3fb950; } .val-b { color: #58a6ff; } .lbl2 { color: #8b949e; }
+
+.btn { width: 100%; padding: 7px; border: none; border-radius: 5px; font-size: 0.82rem;
+       cursor: pointer; font-weight: 600; transition: all 0.15s; margin-bottom: 8px; }
+.btn-secondary { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; font-weight: 400; }
+.btn-secondary:hover { background: #30363d; }
+
+hr { border: none; border-top: 1px solid #21262d; margin: 8px 0; }
+.ibox { background: #0d1117; border: 1px solid #21262d; border-radius: 5px;
+        padding: 8px 10px; font-size: 0.72rem; line-height: 2.0; margin-top: 4px; }
+.ibox span { color: #8b949e; }
+.ibox strong { color: #58a6ff; }
+
+.diag-svg { display: block; margin: 10px auto; }
+
+footer { background: #161b22; border-top: 1px solid #30363d; padding: 5px 16px;
+         font-size: 0.68rem; color: #8b949e; display: flex; gap: 12px; flex-shrink: 0; }
+footer a { color: #58a6ff; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Biped ROM Visualizer</h1>
+    <div class="sub">Diagonal Hip 2DOF (45° slanted axes) · Knee 1DOF pitch · Three.js</div>
+  </div>
+  <div class="badge">ROM Demo</div>
+</header>
+
+<div id="main">
+  <div id="viewport">
+    <!-- foot position overlay -->
+    <div id="foot-label">
+      <div><span class="lbl">Right foot (m) &nbsp;</span>
+           X <span class="vr" id="rf-x">—</span>
+           Y <span class="vr" id="rf-y">—</span>
+           Z <span class="vr" id="rf-z">—</span></div>
+      <div><span class="lbl">Left foot  (m) &nbsp;</span>
+           X <span class="vl" id="lf-x">—</span>
+           Y <span class="vl" id="lf-y">—</span>
+           Z <span class="vl" id="lf-z">—</span></div>
+    </div>
+    <!-- axis legend -->
+    <div id="legend">
+      <div><span class="ax1">━━</span> Hip J1 axis &nbsp;[+45° diag]</div>
+      <div><span class="ax2">━━</span> Hip J2 axis &nbsp;[−45° diag] <span style="color:#555;font-size:0.62rem">(follows J1)</span></div>
+      <div><span class="axk">━━</span> Knee axis &nbsp;&nbsp;[pitch X]</div>
+      <div style="margin-top:4px"><span class="lr">█</span> Right leg &nbsp;&nbsp;<span class="ll">█</span> Left leg</div>
+    </div>
+  </div>
+
+  <div id="panel">
+    <div class="tabs">
+      <button class="tab-btn active" id="tbtn-left"  onclick="showTab('left',this)">Left Leg</button>
+      <button class="tab-btn"        id="tbtn-right" onclick="showTab('right',this)">Right Leg</button>
+      <button class="tab-btn"        id="tbtn-info"  onclick="showTab('info',this)">Info</button>
+    </div>
+
+    <!-- LEFT LEG -->
+    <div id="tab-left" class="tab-content active">
+      <h3>Left Hip – Diagonal Joint 1</h3>
+      <div class="joint-row">
+        <label>
+          <span><span class="jname l">L_J1</span>&nbsp;<span class="jdesc">[+45° axis: X+Z]</span></span>
+          <input id="vl-lj1" class="jval" type="number" min="-120" max="120" step="1" value="0"
+                 onchange="valIn('lj1',this.value)">
+        </label>
+        <input id="sl-lj1" type="range" class="l" min="-120" max="120" step="1" value="0"
+               oninput="slIn('lj1',this.value)">
+      </div>
+
+      <h3>Left Hip – Diagonal Joint 2</h3>
+      <div class="joint-row">
+        <label>
+          <span><span class="jname l">L_J2</span>&nbsp;<span class="jdesc">[−45° axis: X−Z]</span></span>
+          <input id="vl-lj2" class="jval" type="number" min="-120" max="120" step="1" value="0"
+                 onchange="valIn('lj2',this.value)">
+        </label>
+        <input id="sl-lj2" type="range" class="l" min="-120" max="120" step="1" value="0"
+               oninput="slIn('lj2',this.value)">
+      </div>
+
+      <h3>Left Knee – Pitch</h3>
+      <div class="joint-row">
+        <label>
+          <span><span class="jname l">L_K</span>&nbsp;<span class="jdesc">[pitch axis: X]</span></span>
+          <input id="vl-lk" class="jval" type="number" min="-120" max="120" step="1" value="0"
+                 onchange="valIn('lk',this.value)">
+        </label>
+        <input id="sl-lk" type="range" class="l" min="-120" max="120" step="1" value="0"
+               oninput="slIn('lk',this.value)">
+      </div>
+
+      <hr>
+      <h3>Left Foot Position</h3>
+      <div class="sbox">
+        <div><span class="lbl2">X </span><span class="val-b" id="lf-px">—</span> m</div>
+        <div><span class="lbl2">Y </span><span class="val-b" id="lf-py">—</span> m</div>
+        <div><span class="lbl2">Z </span><span class="val-b" id="lf-pz">—</span> m</div>
+      </div>
+
+      <button class="btn btn-secondary" onclick="resetLeg('l')">↺ Reset Left to Zero</button>
+    </div>
+
+    <!-- RIGHT LEG -->
+    <div id="tab-right" class="tab-content">
+      <h3>Right Hip – Diagonal Joint 1</h3>
+      <div class="joint-row">
+        <label>
+          <span><span class="jname r">R_J1</span>&nbsp;<span class="jdesc">[+45° axis: X+Z]</span></span>
+          <input id="vl-rj1" class="jval" type="number" min="-120" max="120" step="1" value="0"
+                 onchange="valIn('rj1',this.value)">
+        </label>
+        <input id="sl-rj1" type="range" class="r" min="-120" max="120" step="1" value="0"
+               oninput="slIn('rj1',this.value)">
+      </div>
+
+      <h3>Right Hip – Diagonal Joint 2</h3>
+      <div class="joint-row">
+        <label>
+          <span><span class="jname r">R_J2</span>&nbsp;<span class="jdesc">[−45° axis: X−Z]</span></span>
+          <input id="vl-rj2" class="jval" type="number" min="-120" max="120" step="1" value="0"
+                 onchange="valIn('rj2',this.value)">
+        </label>
+        <input id="sl-rj2" type="range" class="r" min="-120" max="120" step="1" value="0"
+               oninput="slIn('rj2',this.value)">
+      </div>
+
+      <h3>Right Knee – Pitch</h3>
+      <div class="joint-row">
+        <label>
+          <span><span class="jname r">R_K</span>&nbsp;<span class="jdesc">[pitch axis: X]</span></span>
+          <input id="vl-rk" class="jval" type="number" min="-120" max="120" step="1" value="0"
+                 onchange="valIn('rk',this.value)">
+        </label>
+        <input id="sl-rk" type="range" class="r" min="-120" max="120" step="1" value="0"
+               oninput="slIn('rk',this.value)">
+      </div>
+
+      <hr>
+      <h3>Right Foot Position</h3>
+      <div class="sbox">
+        <div><span class="lbl2">X </span><span class="val-b" id="rf-px">—</span> m</div>
+        <div><span class="lbl2">Y </span><span class="val-b" id="rf-py">—</span> m</div>
+        <div><span class="lbl2">Z </span><span class="val-b" id="rf-pz">—</span> m</div>
+      </div>
+
+      <button class="btn btn-secondary" onclick="resetLeg('r')">↺ Reset Right to Zero</button>
+    </div>
+
+    <!-- INFO -->
+    <div id="tab-info" class="tab-content">
+      <h3>Hip Kinematic Structure</h3>
+      <div class="ibox">
+        <div><strong>Type</strong> <span>Slanted / Diagonal Joint Axis</span></div>
+        <div><strong>DOF</strong> <span>2 (hip) + 1 (knee) per leg</span></div>
+        <div><strong>J1 axis</strong> <span>[1/√2, 0, 1/√2] &nbsp;(+45° XZ plane)</span></div>
+        <div><strong>J2 axis</strong> <span>[1/√2, 0,−1/√2] &nbsp;(−45° XZ plane)</span></div>
+        <div><strong>Knee</strong> <span>[1, 0, 0] &nbsp;(pitch, sagittal)</span></div>
+      </div>
+
+      <h3>Equivalent Motion</h3>
+      <div class="ibox">
+        <div><strong>J1=θ, J2=+θ</strong> <span>≈ pure roll (lateral)</span></div>
+        <div><strong>J1=θ, J2=−θ</strong> <span>≈ pure pitch (sagittal)</span></div>
+        <div><strong>J1≠0, J2=0</strong> <span>diagonal swing</span></div>
+      </div>
+
+      <h3>Coordinate Frame (Y-up)</h3>
+      <div class="ibox">
+        <div><strong>X</strong> <span>right &nbsp;&nbsp;<strong>Y</strong> up &nbsp;&nbsp;<strong>Z</strong> forward</span></div>
+        <div><strong>Hip height</strong> <span>0.60 m</span></div>
+        <div><strong>Upper leg</strong> <span>0.30 m</span></div>
+        <div><strong>Lower leg</strong> <span>0.30 m</span></div>
+        <div><strong>Hip width</strong> <span>±0.12 m</span></div>
+      </div>
+
+      <h3>Axis Arrows</h3>
+      <div class="ibox">
+        <div><span style="color:#ffcc00">■</span> <span>J1 axis: fixed in pelvis frame</span></div>
+        <div><span style="color:#00ff99">■</span> <span>J2 axis: moves with J1 rotation</span></div>
+        <div><span style="color:#58a6ff">■</span> <span>Knee axis: in upper-leg frame</span></div>
+      </div>
+
+      <hr>
+      <button class="btn btn-secondary" onclick="resetAll()">↺ Reset All Joints</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span>Biped ROM · Diagonal Hip 2DOF + Knee 1DOF</span>
+  <a href="mailto:skkbios@gmail.com">skkbios@gmail.com</a>
+  <span style="margin-left:auto">Three.js r165</span>
+</footer>
+
+<script>
+window.addEventListener('error', e => console.error('JS error:', e.message));
+window.addEventListener('unhandledrejection', e => console.error('Module error:', e.reason));
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CONSTANTS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const s45 = Math.SQRT1_2;            // 1/√2
+
+// Diagonal hip joint axes (in local parent frame)
+const AX_J1 = new THREE.Vector3( s45, 0,  s45);  // +45° in XZ plane
+const AX_J2 = new THREE.Vector3( s45, 0, -s45);  // −45° in XZ plane
+const AX_K  = new THREE.Vector3( 1,   0,  0   );  // knee pitch (X axis)
+
+const L_UPPER  = 0.30;   // hip → knee (m)
+const L_LOWER  = 0.30;   // knee → foot (m)
+const HIP_W    = 0.12;   // lateral hip offset from center (m)
+const HIP_H    = 0.60;   // hip height from ground (m)
+
+const COL_R = 0xff6633;   // right leg
+const COL_L = 0x29b6f6;   // left leg
+const COL_J = 0xdde2ea;   // joint sphere
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// THREE.JS SETUP
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.setClearColor(0x0d1117);
+document.getElementById('viewport').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x0d1117, 3, 8);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.001, 20);
+camera.position.set(0.9, 0.7, 1.1);
+camera.lookAt(0, 0.3, 0);
+
+const ctrl = new OrbitControls(camera, renderer.domElement);
+ctrl.target.set(0, 0.3, 0);
+ctrl.enableDamping = true;
+ctrl.dampingFactor = 0.08;
+
+// Lighting
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+const dl = new THREE.DirectionalLight(0xffffff, 1.1);
+dl.position.set(1.5, 2, 1); dl.castShadow = true; scene.add(dl);
+const bl = new THREE.DirectionalLight(0x88aaff, 0.3);
+bl.position.set(-1, 1, -1); scene.add(bl);
+
+// Ground grid
+const grid = new THREE.GridHelper(2, 20, 0x21262d, 0x21262d);
+grid.position.y = 0; scene.add(grid);
+scene.add(new THREE.AxesHelper(0.15));
+
+// Pelvis box (connects the two hips visually)
+const pelvisMesh = new THREE.Mesh(
+  new THREE.BoxGeometry(HIP_W * 2 + 0.04, 0.055, 0.095),
+  new THREE.MeshStandardMaterial({color:0x8899bb, metalness:0.35, roughness:0.55})
+);
+pelvisMesh.position.set(0, HIP_H, 0);
+scene.add(pelvisMesh);
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// BUILD LEG
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function buildLeg(hipX, segColor) {
+  const mat  = new THREE.MeshStandardMaterial({color:segColor, metalness:0.25, roughness:0.55});
+  const jMat = new THREE.MeshStandardMaterial({color:COL_J, metalness:0.55, roughness:0.3, emissive:0x111111});
+
+  // Root at hip position (fixed in world)
+  const root = new THREE.Group();
+  root.position.set(hipX, HIP_H, 0);
+  scene.add(root);
+
+  // Hip joint sphere marker (fixed)
+  root.add(new THREE.Mesh(new THREE.SphereGeometry(0.035, 16, 16), jMat));
+
+  // J1 rotating group (diagonal axis 1)
+  const g1 = new THREE.Group();
+  root.add(g1);
+
+  // J2 rotating group (diagonal axis 2, child of g1)
+  const g2 = new THREE.Group();
+  g1.add(g2);
+
+  // Upper leg cylinder: from hip(0) to knee(-L_UPPER) along Y
+  const upMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.026, 0.022, L_UPPER - 0.05, 12),
+    mat
+  );
+  upMesh.position.y = -(L_UPPER / 2);
+  g2.add(upMesh);
+
+  // Knee fixed frame (at bottom of upper leg)
+  const kFixed = new THREE.Group();
+  kFixed.position.y = -L_UPPER;
+  g2.add(kFixed);
+
+  // Knee joint sphere
+  kFixed.add(new THREE.Mesh(new THREE.SphereGeometry(0.028, 16, 16), jMat));
+
+  // Knee rotating group
+  const gK = new THREE.Group();
+  kFixed.add(gK);
+
+  // Lower leg cylinder
+  const loMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.021, 0.017, L_LOWER - 0.04, 12),
+    mat
+  );
+  loMesh.position.y = -(L_LOWER / 2);
+  gK.add(loMesh);
+
+  // Ankle / foot group
+  const footG = new THREE.Group();
+  footG.position.y = -L_LOWER;
+  gK.add(footG);
+
+  // Ankle sphere
+  footG.add(new THREE.Mesh(new THREE.SphereGeometry(0.020, 12, 12), jMat));
+
+  // Foot box (slightly forward)
+  const footBox = new THREE.Mesh(
+    new THREE.BoxGeometry(0.068, 0.016, 0.155),
+    mat
+  );
+  footBox.position.set(0, -0.008, 0.045);
+  footG.add(footBox);
+
+  // ── Axis indicator arrows ──
+  // J1 axis arrow (yellow) — fixed at hip root, shows J1 axis direction
+  const arr1 = new THREE.ArrowHelper(
+    AX_J1.clone().normalize(),
+    new THREE.Vector3(0, 0, 0),
+    0.095, 0xffcc00, 0.028, 0.016
+  );
+  root.add(arr1);
+
+  // J2 axis arrow (green) — attached to g1 so it rotates with J1
+  // This shows how J2's effective world axis changes as J1 rotates
+  const arr2 = new THREE.ArrowHelper(
+    AX_J2.clone().normalize(),
+    new THREE.Vector3(0, 0, 0),
+    0.095, 0x00ff99, 0.028, 0.016
+  );
+  g1.add(arr2);
+
+  // Knee axis arrow (blue) — at knee, follows upper leg frame
+  const arrK = new THREE.ArrowHelper(
+    AX_K.clone(),
+    new THREE.Vector3(0, 0, 0),
+    0.080, 0x58a6ff, 0.022, 0.013
+  );
+  kFixed.add(arrK);
+
+  // Invisible marker at foot center for world position query
+  const footMarker = new THREE.Object3D();
+  footG.add(footMarker);
+
+  return { root, g1, g2, gK, footMarker };
+}
+
+const legR = buildLeg( HIP_W, COL_R);
+const legL = buildLeg(-HIP_W, COL_L);
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// JOINT STATE
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const Q = { rj1:0, rj2:0, rk:0, lj1:0, lj2:0, lk:0 };
+
+function applyJoint(id, deg) {
+  const rad = deg * Math.PI / 180;
+  Q[id] = deg;
+  const isRight = id[0] === 'r';
+  const leg = isRight ? legR : legL;
+  const jKey = id.slice(1);   // 'j1', 'j2', 'k'
+  if (jKey === 'j1') leg.g1.setRotationFromAxisAngle(AX_J1, rad);
+  if (jKey === 'j2') leg.g2.setRotationFromAxisAngle(AX_J2, rad);
+  if (jKey === 'k' ) leg.gK.setRotationFromAxisAngle(AX_K,  rad);
+  updateFootDisplay();
+}
+
+function updateFootDisplay() {
+  const rf = new THREE.Vector3();
+  const lf = new THREE.Vector3();
+  legR.footMarker.getWorldPosition(rf);
+  legL.footMarker.getWorldPosition(lf);
+
+  const fmt = v => v.toFixed(3);
+  document.getElementById('rf-x').textContent = fmt(rf.x);
+  document.getElementById('rf-y').textContent = fmt(rf.y);
+  document.getElementById('rf-z').textContent = fmt(rf.z);
+  document.getElementById('lf-x').textContent = fmt(lf.x);
+  document.getElementById('lf-y').textContent = fmt(lf.y);
+  document.getElementById('lf-z').textContent = fmt(lf.z);
+
+  document.getElementById('rf-px').textContent = fmt(rf.x);
+  document.getElementById('rf-py').textContent = fmt(rf.y);
+  document.getElementById('rf-pz').textContent = fmt(rf.z);
+  document.getElementById('lf-px').textContent = fmt(lf.x);
+  document.getElementById('lf-py').textContent = fmt(lf.y);
+  document.getElementById('lf-pz').textContent = fmt(lf.z);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// UI CALLBACKS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+window.showTab = (t, btn) => {
+  document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(e => e.classList.remove('active'));
+  document.getElementById('tab-' + t).classList.add('active');
+  btn.classList.add('active');
+};
+
+window.slIn = (id, val) => {
+  const d = parseFloat(val);
+  document.getElementById('vl-' + id).value = d.toFixed(0);
+  applyJoint(id, d);
+};
+
+window.valIn = (id, val) => {
+  const d = Math.max(-120, Math.min(120, parseFloat(val) || 0));
+  document.getElementById('sl-' + id).value = d;
+  document.getElementById('vl-' + id).value = d.toFixed(0);
+  applyJoint(id, d);
+};
+
+window.resetLeg = (side) => {
+  ['j1','j2','k'].forEach(j => {
+    const id = side + j;
+    document.getElementById('sl-' + id).value = 0;
+    document.getElementById('vl-' + id).value = 0;
+    applyJoint(id, 0);
+  });
+};
+
+window.resetAll = () => { resetLeg('l'); resetLeg('r'); };
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// RENDER LOOP
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function resize() {
+  const vp = document.getElementById('viewport');
+  const w = vp.clientWidth, h = vp.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+updateFootDisplay();
+(function loop() { requestAnimationFrame(loop); ctrl.update(); renderer.render(scene, camera); })();
+
+</script>
+</body>
+</html>
