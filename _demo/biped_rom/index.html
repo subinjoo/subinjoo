@@ -116,8 +116,8 @@ footer a { color: #58a6ff; text-decoration: none; }
     </div>
     <!-- axis legend -->
     <div id="legend">
-      <div><span class="ax1">━━</span> Hip J1 axis &nbsp;[+45° diag]</div>
-      <div><span class="ax2">━━</span> Hip J2 axis &nbsp;[−45° diag] <span style="color:#555;font-size:0.62rem">(follows J1)</span></div>
+      <div><span class="ax1">━━</span> Hip J1 axis &nbsp;[45° in XY]</div>
+      <div><span class="ax2">━━</span> Hip J2 axis &nbsp;[Y, vertical] <span style="color:#555;font-size:0.62rem">(follows J1)</span></div>
       <div><span class="axk">━━</span> Knee axis &nbsp;&nbsp;[pitch X]</div>
       <div style="margin-top:4px"><span class="lr">█</span> Right leg &nbsp;&nbsp;<span class="ll">█</span> Left leg</div>
     </div>
@@ -135,7 +135,7 @@ footer a { color: #58a6ff; text-decoration: none; }
       <h3>Left Hip – Diagonal Joint 1</h3>
       <div class="joint-row">
         <label>
-          <span><span class="jname l">L_J1</span>&nbsp;<span class="jdesc">[+45° axis: X+Z]</span></span>
+          <span><span class="jname l">L_J1</span>&nbsp;<span class="jdesc">[45° in XY: X+Y]</span></span>
           <input id="vl-lj1" class="jval" type="number" min="-120" max="120" step="1" value="0"
                  onchange="valIn('lj1',this.value)">
         </label>
@@ -146,7 +146,7 @@ footer a { color: #58a6ff; text-decoration: none; }
       <h3>Left Hip – Diagonal Joint 2</h3>
       <div class="joint-row">
         <label>
-          <span><span class="jname l">L_J2</span>&nbsp;<span class="jdesc">[−45° axis: X−Z]</span></span>
+          <span><span class="jname l">L_J2</span>&nbsp;<span class="jdesc">[vertical Y · +10cm offset]</span></span>
           <input id="vl-lj2" class="jval" type="number" min="-120" max="120" step="1" value="0"
                  onchange="valIn('lj2',this.value)">
         </label>
@@ -181,7 +181,7 @@ footer a { color: #58a6ff; text-decoration: none; }
       <h3>Right Hip – Diagonal Joint 1</h3>
       <div class="joint-row">
         <label>
-          <span><span class="jname r">R_J1</span>&nbsp;<span class="jdesc">[+45° axis: X+Z]</span></span>
+          <span><span class="jname r">R_J1</span>&nbsp;<span class="jdesc">[45° in XY: X+Y]</span></span>
           <input id="vl-rj1" class="jval" type="number" min="-120" max="120" step="1" value="0"
                  onchange="valIn('rj1',this.value)">
         </label>
@@ -192,7 +192,7 @@ footer a { color: #58a6ff; text-decoration: none; }
       <h3>Right Hip – Diagonal Joint 2</h3>
       <div class="joint-row">
         <label>
-          <span><span class="jname r">R_J2</span>&nbsp;<span class="jdesc">[−45° axis: X−Z]</span></span>
+          <span><span class="jname r">R_J2</span>&nbsp;<span class="jdesc">[vertical Y · +10cm offset]</span></span>
           <input id="vl-rj2" class="jval" type="number" min="-120" max="120" step="1" value="0"
                  onchange="valIn('rj2',this.value)">
         </label>
@@ -226,25 +226,27 @@ footer a { color: #58a6ff; text-decoration: none; }
     <div id="tab-info" class="tab-content">
       <h3>Hip Kinematic Structure</h3>
       <div class="ibox">
-        <div><strong>Type</strong> <span>Slanted / Diagonal Joint Axis</span></div>
+        <div><strong>Type</strong> <span>Diagonal Hip · XY-plane axes</span></div>
         <div><strong>DOF</strong> <span>2 (hip) + 1 (knee) per leg</span></div>
-        <div><strong>J1 axis</strong> <span>[1/√2, 0, 1/√2] &nbsp;(+45° XZ plane)</span></div>
-        <div><strong>J2 axis</strong> <span>[1/√2, 0,−1/√2] &nbsp;(−45° XZ plane)</span></div>
+        <div><strong>J1 axis</strong> <span>[1/√2, 1/√2, 0] &nbsp;(Z축 기준 45°)</span></div>
+        <div><strong>J2 offset</strong> <span>J1로부터 −Y 방향 10 cm</span></div>
+        <div><strong>J2 axis</strong> <span>[0, 1, 0] &nbsp;(Y축 = 지면 수직)</span></div>
         <div><strong>Knee</strong> <span>[1, 0, 0] &nbsp;(pitch, sagittal)</span></div>
       </div>
 
       <h3>Equivalent Motion</h3>
       <div class="ibox">
-        <div><strong>J1=θ, J2=+θ</strong> <span>≈ pure roll (lateral)</span></div>
-        <div><strong>J1=θ, J2=−θ</strong> <span>≈ pure pitch (sagittal)</span></div>
-        <div><strong>J1≠0, J2=0</strong> <span>diagonal swing</span></div>
+        <div><strong>J1=θ</strong> <span>diagonal swing (roll+pitch combined)</span></div>
+        <div><strong>J2=θ</strong> <span>yaw (leg rotation about vertical)</span></div>
+        <div><strong>Knee=θ</strong> <span>flexion/extension (sagittal plane)</span></div>
       </div>
 
       <h3>Coordinate Frame (Y-up)</h3>
       <div class="ibox">
         <div><strong>X</strong> <span>right &nbsp;&nbsp;<strong>Y</strong> up &nbsp;&nbsp;<strong>Z</strong> forward</span></div>
-        <div><strong>Hip height</strong> <span>0.60 m</span></div>
-        <div><strong>Upper leg</strong> <span>0.30 m</span></div>
+        <div><strong>Hip height</strong> <span>0.70 m</span></div>
+        <div><strong>J1→J2 link</strong> <span>0.10 m</span></div>
+        <div><strong>Upper leg</strong> <span>0.30 m (J2→knee)</span></div>
         <div><strong>Lower leg</strong> <span>0.30 m</span></div>
         <div><strong>Hip width</strong> <span>±0.12 m</span></div>
       </div>
@@ -291,15 +293,18 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const s45 = Math.SQRT1_2;            // 1/√2
 
-// Diagonal hip joint axes (in local parent frame)
-const AX_J1 = new THREE.Vector3( s45, 0,  s45);  // +45° in XZ plane
-const AX_J2 = new THREE.Vector3( s45, 0, -s45);  // −45° in XZ plane
-const AX_K  = new THREE.Vector3( 1,   0,  0   );  // knee pitch (X axis)
+// Hip joint axes (in local parent frame, XY plane, Y-up)
+// J1: Z축 기준 45° 회전 → [1/√2, 1/√2, 0] (XY 평면, 45° from X)
+// J2: J1에서 다시 Z축 기준 45° 회전 → [0, 1, 0] (Y축 = 지면 수직)
+const AX_J1 = new THREE.Vector3( s45, s45, 0);  // 45° from X in XY plane
+const AX_J2 = new THREE.Vector3( 0,   1,   0);  // Y axis — perpendicular to ground
+const AX_K  = new THREE.Vector3( 1,   0,   0);  // knee pitch (X axis)
 
-const L_UPPER  = 0.30;   // hip → knee (m)
+const J12_OFF  = 0.10;   // J1 → J2 structural offset (m)
+const L_UPPER  = 0.30;   // J2 → knee (m)
 const L_LOWER  = 0.30;   // knee → foot (m)
 const HIP_W    = 0.12;   // lateral hip offset from center (m)
-const HIP_H    = 0.60;   // hip height from ground (m)
+const HIP_H    = 0.70;   // hip height — raised to keep foot at ground (J12_OFF+L_UPPER+L_LOWER)
 
 const COL_R = 0xff6633;   // right leg
 const COL_L = 0x29b6f6;   // left leg
@@ -358,18 +363,34 @@ function buildLeg(hipX, segColor) {
   root.position.set(hipX, HIP_H, 0);
   scene.add(root);
 
-  // Hip joint sphere marker (fixed)
+  // J1 joint sphere marker (fixed at hip)
   root.add(new THREE.Mesh(new THREE.SphereGeometry(0.035, 16, 16), jMat));
 
-  // J1 rotating group (diagonal axis 1)
+  // J1 rotating group (axis: 45° from X in XY plane)
   const g1 = new THREE.Group();
   root.add(g1);
 
-  // J2 rotating group (diagonal axis 2, child of g1)
-  const g2 = new THREE.Group();
-  g1.add(g2);
+  // J1→J2 structural link cylinder (10 cm, in g1 frame along -Y)
+  const linkMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.016, 0.016, J12_OFF - 0.01, 10),
+    mat
+  );
+  linkMesh.position.y = -(J12_OFF / 2);
+  g1.add(linkMesh);
 
-  // Upper leg cylinder: from hip(0) to knee(-L_UPPER) along Y
+  // J2 fixed frame: 10 cm below J1 (child of g1 → follows J1 rotation)
+  const j2Fixed = new THREE.Group();
+  j2Fixed.position.y = -J12_OFF;
+  g1.add(j2Fixed);
+
+  // J2 joint sphere marker
+  j2Fixed.add(new THREE.Mesh(new THREE.SphereGeometry(0.030, 16, 16), jMat));
+
+  // J2 rotating group (axis: Y = vertical, child of j2Fixed)
+  const g2 = new THREE.Group();
+  j2Fixed.add(g2);
+
+  // Upper leg cylinder: from J2(0) to knee(-L_UPPER) along Y
   const upMesh = new THREE.Mesh(
     new THREE.CylinderGeometry(0.026, 0.022, L_UPPER - 0.05, 12),
     mat
@@ -422,14 +443,14 @@ function buildLeg(hipX, segColor) {
   );
   root.add(arr1);
 
-  // J2 axis arrow (green) — attached to g1 so it rotates with J1
-  // This shows how J2's effective world axis changes as J1 rotates
+  // J2 axis arrow (green) — at j2Fixed (10cm below J1, follows J1 rotation)
+  // shows how J2's world axis changes as J1 rotates
   const arr2 = new THREE.ArrowHelper(
     AX_J2.clone().normalize(),
     new THREE.Vector3(0, 0, 0),
     0.095, 0x00ff99, 0.028, 0.016
   );
-  g1.add(arr2);
+  j2Fixed.add(arr2);
 
   // Knee axis arrow (blue) — at knee, follows upper leg frame
   const arrK = new THREE.ArrowHelper(
